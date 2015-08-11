@@ -42,9 +42,24 @@ private[persistence] trait LeveldbStore extends Actor with WriteJournalBase with
 
   def asyncWriteMessages(messages: immutable.Seq[AtomicWrite]): Future[immutable.Seq[Try[Unit]]] =
     Future.fromTry(Try {
-      withBatch(batch ⇒ messages.map { a ⇒
-        Try(a.payload.foreach(message ⇒ addToMessageBatch(message, batch)))
-      })
+      withBatch { batch ⇒
+        var result: immutable.Seq[Try[Unit]] = Nil
+        val iter = messages.iterator
+        var n = 0
+        while (iter.hasNext) {
+          try {
+            iter.next().payload.foreach(message ⇒ addToMessageBatch(message, batch))
+            n += 1
+          } catch {
+            case NonFatal(e) ⇒
+              if (result.isEmpty)
+                result = Vector.fill(n)(AsyncWriteJournal.successUnit)
+              result :+= Failure(e)
+          }
+        }
+
+        result
+      }
     })
 
   def asyncDeleteMessagesTo(persistenceId: String, toSequenceNr: Long): Future[Unit] =
