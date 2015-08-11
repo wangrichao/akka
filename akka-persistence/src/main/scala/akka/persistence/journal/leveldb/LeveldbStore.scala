@@ -50,6 +50,8 @@ private[persistence] trait LeveldbStore extends Actor with WriteJournalBase with
           try {
             iter.next().payload.foreach(message ⇒ addToMessageBatch(message, batch))
             n += 1
+            if (result.nonEmpty)
+              result :+= AsyncWriteJournal.successUnit
           } catch {
             case NonFatal(e) ⇒
               if (result.isEmpty)
