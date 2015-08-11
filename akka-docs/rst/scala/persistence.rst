@@ -672,7 +672,7 @@ A Simple Example
 To demonstrate the features of the ``PersistentFSM`` trait, consider an actor which represents a Web store customer.
 The contract of our "WebStoreCustomerFSMActor" is that it accepts the following commands:
 
-.. includecode:: ../../../akka-persistence/src/test/scala/akka/persistence/fsm/PersistentFSMSpec.scala#customer-commands
+.. includecode:: ../../../akka-persistence/src/test/scala/akka/persistence/fsm/PersistentFSMActorSpec.scala#customer-commands
 
 ``AddItem`` sent when the customer adds an item to a shopping cart
 ``Buy`` - when the customer finishes the purchase
@@ -681,7 +681,7 @@ The contract of our "WebStoreCustomerFSMActor" is that it accepts the following 
 
 The customer can be in one of the following states:
 
-.. includecode:: ../../../akka-persistence/src/test/scala/akka/persistence/fsm/PersistentFSMSpec.scala#customer-states
+.. includecode:: ../../../akka-persistence/src/test/scala/akka/persistence/fsm/PersistentFSMActorSpec.scala#customer-states
 
 ``LookingAround`` customer is browsing the site, but hasn't added anything to the shopping cart
 ``Shopping`` customer has recently added items to the shopping cart
@@ -697,22 +697,22 @@ The customer can be in one of the following states:
 Customer's actions are "recorded" as a sequence of "domain events", which are persisted. Those events are replayed on actor's
 start in order to restore the latest customer's state:
 
-.. includecode:: ../../../akka-persistence/src/test/scala/akka/persistence/fsm/PersistentFSMSpec.scala#customer-domain-events
+.. includecode:: ../../../akka-persistence/src/test/scala/akka/persistence/fsm/PersistentFSMActorSpec.scala#customer-domain-events
 
 Customer state data represents the items in customer's shopping cart:
 
-.. includecode:: ../../../akka-persistence/src/test/scala/akka/persistence/fsm/PersistentFSMSpec.scala#customer-states-data
+.. includecode:: ../../../akka-persistence/src/test/scala/akka/persistence/fsm/PersistentFSMActorSpec.scala#customer-states-data
 
 Here is how everything is wired together:
 
-.. includecode:: ../../../akka-persistence/src/test/scala/akka/persistence/fsm/PersistentFSMSpec.scala#customer-fsm-body
+.. includecode:: ../../../akka-persistence/src/test/scala/akka/persistence/fsm/PersistentFSMActorSpec.scala#customer-fsm-body
 
 .. note::
 
   State data can only be modified directly on initialization. Later it's modified only as a result of applying domain events.
   Override the ``applyEvent`` method to define how state data is affected by domain events, see the example below
 
-.. includecode:: ../../../akka-persistence/src/test/scala/akka/persistence/fsm/PersistentFSMSpec.scala#customer-apply-event
+.. includecode:: ../../../akka-persistence/src/test/scala/akka/persistence/fsm/PersistentFSMActorSpec.scala#customer-apply-event
 
 .. _storage-plugins:
 
@@ -765,8 +765,13 @@ A journal plugin can be activated with the following minimal configuration:
 .. includecode:: code/docs/persistence/PersistencePluginDocSpec.scala#journal-plugin-config
 
 The specified plugin ``class`` must have a no-arg constructor. The ``plugin-dispatcher`` is the dispatcher
-used for the plugin actor. If not specified, it defaults to ``akka.persistence.dispatchers.default-plugin-dispatcher``
-for ``SyncWriteJournal`` plugins and ``akka.actor.default-dispatcher`` for ``AsyncWriteJournal`` plugins.
+used for the plugin actor. If not specified, it defaults to ``akka.persistence.dispatchers.default-plugin-dispatcher``.
+
+The journal plugin instance is an actor so the methods corresponding to requests from persistent actors
+are executed sequentially. It may delegate to asyncrounous libraries, spawn futures, or delegate to other
+actors to achive parallelism. 
+
+Don't run journal tasks/futures on the system default dispatcher, since that might starve other tasks.
 
 Snapshot store plugin API
 -------------------------
@@ -781,6 +786,12 @@ A snapshot store plugin can be activated with the following minimal configuratio
 
 The specified plugin ``class`` must have a no-arg constructor. The ``plugin-dispatcher`` is the dispatcher
 used for the plugin actor. If not specified, it defaults to ``akka.persistence.dispatchers.default-plugin-dispatcher``.
+
+The snapshot store instance is an actor so the methods corresponding to requests from persistent actors
+are executed sequentially. It may delegate to asyncrounous libraries, spawn futures, or delegate to other
+actors to achive parallelism.
+
+Don't run snapshot store tasks/futures on the system default dispatcher, since that might starve other tasks.
 
 Plugin TCK
 ----------
